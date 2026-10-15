@@ -1,16 +1,16 @@
 # syntax=docker/dockerfile:1
 FROM python:3.12-slim AS builder
-COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.7 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 WORKDIR /app
 
 # Dependencies first, so code changes do not invalidate this layer.
-# (uv.lock* is copied when present; run `uv lock` once and commit it for reproducible builds.)
-COPY pyproject.toml README.md uv.lock* ./
-RUN uv sync --no-dev --no-install-project
+# --frozen: the build fails if uv.lock is missing or out of sync with pyproject.toml.
+COPY pyproject.toml README.md uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 COPY src ./src
-RUN uv sync --no-dev
+RUN uv sync --frozen --no-dev
 
 FROM python:3.12-slim
 RUN useradd --create-home --uid 1000 app
