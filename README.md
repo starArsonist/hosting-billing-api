@@ -1,30 +1,30 @@
 # hosting-billing-api
 
-Async REST API for accounting of hosted equipment: devices, daily telemetry,
-auditable corrections and invoices that stay correct when prices and tenants change.
+Асинхронный REST API для учёта размещённого оборудования: устройства, ежедневная телеметрия,
+аудируемые корректировки и счета, которые остаются корректными при смене цен и арендаторов.
 
 Python 3.11 · FastAPI · SQLAlchemy 2.0 (async) · Alembic · PostgreSQL / SQLite · pytest
 
-> Portfolio project. It is a clean-room redesign of a service I worked on in a
-> commercial setting; all names, data and code here are original and fictional.
+> Портфолио-проект. Это переработка «с чистого листа» сервиса, над которым я работал в
+> коммерческой компании; все названия, данные и код здесь оригинальные и вымышленные.
 
-## What it does
+## Что умеет
 
-- **Devices** with models, owners, tenants (clients renting the device) and status.
-- **Daily telemetry** per device: uptime, energy (kWh), hashrate (TH/s).
-- **Overrides**: a correction never destroys the original. Each metric can be corrected
-  independently (`null` = keep the original); reads return both values.
-- **Billing** that is computed per day:
-  - the price is the one valid *on that day* (tariff history, not "current price");
-  - a day is billed to whoever rented the device *on that day* (tenant history);
-  - consecutive days at the same price are grouped into segments for the invoice;
-  - money is `Decimal`, rounded half-up per segment.
-- **Bulk import** (`/stats/bulk`, `/stats/overrides/bulk`): idempotent upsert keyed by
-  (device, day); devices matched by serial or external id; unknown devices are reported,
-  not fatal; absent metrics do not overwrite stored ones.
-- **Matrix view** with filters and keyset (cursor) pagination, stable under inserts.
+- **Устройства** с моделями, владельцами, арендаторами (клиентами, арендующими устройство) и статусом.
+- **Ежедневная телеметрия** по каждому устройству: аптайм, энергопотребление (кВт·ч), хешрейт (TH/s).
+- **Корректировки (overrides)**: исправление никогда не уничтожает оригинал. Каждую метрику
+  можно корректировать независимо (`null` = оставить оригинал); при чтении возвращаются оба значения.
+- **Биллинг**, который считается посуточно:
+  - берётся цена, действовавшая *в этот день* (история тарифов, а не «текущая цена»);
+  - день выставляется тому, кто арендовал устройство *в этот день* (история арендаторов);
+  - подряд идущие дни с одной ценой группируются в сегменты для счёта;
+  - деньги хранятся как `Decimal`, округление half-up выполняется по сегментам.
+- **Массовый импорт** (`/stats/bulk`, `/stats/overrides/bulk`): идемпотентный upsert по ключу
+  (устройство, день); устройства сопоставляются по серийному номеру или внешнему id; неизвестные
+  устройства попадают в отчёт, а не приводят к ошибке; отсутствующие метрики не перезаписывают сохранённые.
+- **Матричное представление** с фильтрами и keyset-пагинацией (по курсору), устойчивой к вставкам.
 
-## Design
+## Архитектура
 
 ```
 presentation  routers, pydantic schemas      (HTTP only)
@@ -33,22 +33,22 @@ domain        billing.py, stats.py           (pure Python, no I/O, fully unit-te
 infrastructure  SQLAlchemy models, repositories, session
 ```
 
-Notable choices:
+Ключевые решения:
 
-- Billing math lives in the pure domain layer, so the rules are testable without a database.
-- ORM models have no relationships: avoids implicit lazy loads (`MissingGreenlet`) in async code.
-- Upsert is dialect-agnostic (`ON CONFLICT DO UPDATE` with `coalesce`), works on SQLite and PostgreSQL.
-- Deletes cascade at the database level.
-- Optional API-key auth via `X-API-Key` (`/health` is open).
+- Расчёт биллинга живёт в чистом доменном слое, поэтому правила тестируются без базы данных.
+- У ORM-моделей нет relationship: это исключает неявные ленивые загрузки (`MissingGreenlet`) в асинхронном коде.
+- Upsert не зависит от диалекта (`ON CONFLICT DO UPDATE` с `coalesce`) и работает и в SQLite, и в PostgreSQL.
+- Удаления каскадируются на уровне базы данных.
+- Опциональная аутентификация по API-ключу через `X-API-Key` (`/health` открыт).
 
-## Run
+## Запуск
 
 ```bash
 cp .env.example .env
 docker compose up --build        # PostgreSQL + API on http://127.0.0.1:8000/docs
 ```
 
-Without Docker:
+Без Docker:
 
 ```bash
 uv sync --group dev
@@ -57,7 +57,7 @@ uv run python scripts/seed.py    # optional demo data
 uv run uvicorn hosting_billing.main:app_factory --factory --reload
 ```
 
-## Example
+## Пример
 
 ```bash
 curl -X POST localhost:8000/clients -H 'content-type: application/json' \
@@ -67,16 +67,16 @@ curl -X POST localhost:8000/clients/1/tariffs -H 'content-type: application/json
 curl 'localhost:8000/billing/client-report?client_id=1&date_from=2026-01-01&date_to=2026-02-28'
 ```
 
-## Tests
+## Тесты
 
 ```bash
 uv run pytest                                         # SQLite
 TEST_DATABASE_URL=postgresql+asyncpg://... uv run pytest   # PostgreSQL
 ```
 
-`tests/unit` covers the billing and schema rules; `tests/integration` drives the HTTP API
-through `httpx.ASGITransport` against a real database.
+`tests/unit` покрывает правила биллинга и схемы; `tests/integration` прогоняет HTTP API
+через `httpx.ASGITransport` на реальной базе данных.
 
-## License
+## Лицензия
 
 MIT
