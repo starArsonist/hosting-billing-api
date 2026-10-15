@@ -28,7 +28,7 @@ from .base import Base
 
 def utcnow() -> dt.datetime:
     """Naive UTC timestamp (the schema stores timestamps without time zone)."""
-    return dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
+    return dt.datetime.now(dt.UTC).replace(tzinfo=None)
 
 
 class DeviceModel(Base):
